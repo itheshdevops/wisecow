@@ -1,7 +1,0 @@
-replicaCount: 1
-name: wisecow
-label: wisecow
-image:
-  repository: wisecow
-  tag: latest
-  pullPolicy: IfNotPresent
