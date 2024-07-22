@@ -1,0 +1,47 @@
+name: CI/CD Pipeline for wisecow
+
+on:
+  push:
+    branches:
+      - main  # Trigger on push to main branch (adjust branch name as needed)
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build Docker image
+        id: docker_build
+        run: |
+          docker build -t wisecow:latest .
+          echo "::set-output name=image_tag::wisecow:${{ github.sha }}"
+        continue-on-error: true  # Continue even if docker build fails
+
+      - name: Tag Docker image with commit SHA
+        id: tag_image
+        run: |
+          docker tag wisecow:latest dockerhub.com/wisecow:${{ steps.docker_build.outputs.image_tag }}
+          echo "Tagged image: dockerhub.com/wisecow:${{ steps.docker_build.outputs.image_tag }}"
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push dockerhub.com/wisecow:${{ steps.docker_build.outputs.image_tag }}
+          echo "Pushed image to Docker Hub: dockerhub.com/wisecow:${{ steps.docker_build.outputs.image_tag }}"
+
+      # Optionally, you can add more steps here for testing, linting, etc.
+      - name: Upgrade Helm Chart
+        uses: azure/k8s-deploy@v1
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_DATA }}
+          helmVersion: '3.0.0'  # Adjust as per your Helm version
+          command: upgrade
+          releaseName: wisecow  # Specify your Helm release name
+          chartPath: ./app/helm_wisecow  # Path to your Helm chart directory
+          setValues: image.tag=${{ steps.docker_build.outputs.image_tag }},image.repository=dockerhub.com/wisecow
+
